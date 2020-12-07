@@ -17,94 +17,65 @@
 library(glmnet)
 library(faraway)
 library(leaps)
+library(tidyverse)
 
-hc_df<-read.csv('hate_crimes_full.csv', row.names = 'state_abbrev')
-colnames(hc_df)
+hate_DF<-read.csv('hate_crimes_full_v2.csv', row.names = 'state_abbrev')
+colnames(hate_DF)
 
 #Need to set categorical variables so R can recognize them as such 
-hc_df$confederate<-factor(hc_df$confederate)
-is.factor(hc_df$confederate)
-contrasts(hc_df$confederate) #Just to verify that R has the right reference class set
-hc_df$permit<-factor(hc_df$permit) #State has permit to purchase law 1 = yes
-hc_df$universl<-factor(hc_df$universl) #State has universal background checks 1 = yes
+hate_DF$confederate<-factor(hate_DF$confederate)
+is.factor(hate_DF$confederate)
+contrasts(hate_DF$confederate) #Just to verify that R has the right reference class set
+hate_DF$permit<-factor(hate_DF$permit) #State has permit to purchase law 1 = yes
+hate_DF$universl<-factor(hate_DF$universl) #State has universal background checks 1 = yes
+hate_DF$con_uni_combo<-factor(hate_DF$con_uni_combo)
 
-#Looking at making a dataframe only with SPLC data first 
-hc_df<-hc_df[ , !(names(hc_df) %in% c('hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 
-                                      'FIP	Year',	'HFR_se',	'BRFSS', 'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
-                                      'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'X'))]
+#Looking at making a dataframe only including the variables left after removing these below
+hate_DF<-hate_DF[ , !(names(hate_DF) %in% c('fbi_2019_per100k', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 
+                                      'hate_group_count_2019', 'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
+                                      'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
+                                      'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap',
+                                      'confederate', 'universl'))]
 
-hc_df<-hc_df[!is.na(c(hc_df$avg_hatecrimes_per_100k_fbi, 
-                      hc_df$share_non_citizen)),]
+#Setting the reference level to be neither for universal and confederate combo. Should have 3 sepereate equations from this
+levels(hate_DF$con_uni_combo)
+hate_DF$con_uni_combo<-relevel(hate_DF$con_uni_combo, ref = "Neither")
+levels(hate_DF$con_uni_combo)
 
 #Used to remove all the rows that include NA values 
-hc_df<-hc_df[complete.cases(hc_df), ] 
+hate_DF<-hate_DF %>% drop_na(avg_hatecrimes_per_100k_fbi)
+#hate_DF<-hate_DF[!(row.names(hate_DF) %in% c('DC')),] #REMOVE THE DC NEED TO DO THAT
 
-nrow(hc_df)
+nrow(hate_DF)
 
-x<-model.matrix(avg_hatecrimes_per_100k_fbi~share_unemployed_seasonal+
-                  share_population_with_high_school_degree+
-                  share_white_poverty+
-                  share_non_white+
-                  median_household_income+
-                  share_population_in_metro_areas+
-                  share_non_citizen+
-                  gini_index+
-                  gini_index+
-                  elasticity+
-                  confederate+
-                  HFR+
-                  universl+
-                  permit+
-                  HateGroupCount+
-                  Male_FS_S+
-                  Fem_FS_S, hc_df)[,-1] # remove the first column of 1s representing the intercept
-y<-hc_df$avg_hatecrimes_per_100k_fbi
+pairs(hate_DF, lower.panel=NULL, main="Scatterplots of Predictors")
 
-#Make sure I still have the number of rows I suspect to have 
-nrow(x)
+#Can see that a lot of variables have large amount of correlation 
 
-pairs(x, lower.panel=NULL, main="Scatterplots of Predictors")
+boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$confederate)
+boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$universl)
+boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$permit)
 
-#Correlation just to see if any of the variables have potential
-cor(x)
-
-boxplot(hc_df$avg_hatecrimes_per_100k_fbi~hc_df$confederate)
-boxplot(hc_df$avg_hatecrimes_per_100k_fbi~hc_df$universl)
-boxplot(hc_df$avg_hatecrimes_per_100k_fbi~hc_df$permit)
-
-result<-lm(avg_hatecrimes_per_100k_fbi~., data = hc_df)
+result<-lm(avg_hatecrimes_per_100k_fbi~., data = hate_DF)
 
 vif(result) # HFR along with male and female suicide rate is highly correlated (18+ VIF)
 
 summary(result)
 
 # #########################################################################
+#Remove the variables I don't want cause of high correlation from VIF calculation
 
-#Perform all possible regressions (1st order) gets you which predictors are best for certain situations
-allreg <- regsubsets(avg_hatecrimes_per_100k_fbi ~., data=hc_df, nbest=9)
+hate_DF<-hate_DF[ , !(names(hate_DF) %in% c('median_household_income', 'share_population_with_high_school_degree', 'Fem_FS_S', 'HFR', 'share_voters_voted_trump', 
+                                      'share_population_in_metro_areas', 'share_non_white', 'share_non_citizen', 'Male_FS_S'))]
 
-##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
-best <- as.data.frame(summary(allreg)$outmat)
-best$p <- as.numeric(substr(rownames(best),1,1))+1
-best$r2 <- summary(allreg)$rsq
-best$adjr2 <- summary(allreg)$adjr2
-best$mse <- (summary(allreg)$rss)/(dim(hc_df)[1]-best$p)
-best$cp <- summary(allreg)$cp
-best$bic <- summary(allreg)$bic
-best
+# #########################################################################
 
-#Sort by various criteria
-best[order(best$r2),]     
-best[order(best$adjr2),]  
-best[order(best$mse),]    
-best[order(best$cp),]     
-best[order(best$bic),]    
-
+hate_DF
 #Intercept only model to set up for selection process
-regnull <- lm(avg_hatecrimes_per_100k_fbi~1, data=hc_df)
+regnull <- lm(avg_hatecrimes_per_100k_fbi~1, data=hate_DF)
 
 #Model with all 17 predictors for our model
-regfull <- lm(avg_hatecrimes_per_100k_fbi~., data=hc_df)
+regfull <- lm(avg_hatecrimes_per_100k_fbi~., data=hate_DF)
 
 ##forward selection, backward elimination, and stepwise regression
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
@@ -112,26 +83,28 @@ step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
 
 #Forward selection model
-forward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ Male_FS_S + share_non_white + 
-                       share_non_citizen, data = hc_df)
-
+forward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ confederate + gini_index, 
+                     data = hate_DF)
+summary(forward_result)
 #Backward selection model suicide rate becomes important when going with this approach
-backward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ share_non_citizen + 
-     gini_index + share_non_white + HateGroupCount, data = hc_df)
-
+backward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ confederate + gini_index, 
+                      data = hate_DF)
+summary(backward_result)
 #Both selections model
-both_result<-lm(formula = avg_hatecrimes_per_100k_fbi ~ share_non_white + 
-                  share_non_citizen, data = hc_df)
-
+both_result<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+                  hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+                data = hate_DF)
+summary(both_result)
 # #########################################################################
 
 #Full Model
-result<-lm(avg_hatecrimes_per_100k_fbi~., data = hc_df)
+result<-lm(avg_hatecrimes_per_100k_fbi~., data = hate_DF)
 summary(result)
 
 #Model chosen from backwards selection
-resultsmall<-lm(formula = avg_hatecrimes_per_100k_fbi ~ share_non_citizen + 
-                  gini_index + share_non_white + HateGroupCount, data = hc_df)
+resultsmall<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+                  hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+                data = hate_DF)
 summary(resultsmall)
 
 # ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
@@ -145,18 +118,88 @@ anova(result)
 #ANSWER: Go with the smaller model because you fail to reject the null since p value
 #is greater than your significance level of 0.05
 
-# This tells you that you reject the null Hypothesis which means you must keep interaction terms in the model also the 
-# adjusted R squared value is greater in the model that includes interaction with color. 
+#NEED TO COMPLETE
 
-# #########################################################################
+result2<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+              hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+            data = hate_DF)
+summary(result2)
 
-#Residual Plot of the smaller model from backwards selection
-plot(resultsmall$fitted.values,resultsmall$residuals, main="Plot of Residuals against Fitted Values")
-abline(h=0,col="red")
+#Model chosen from backwards selection
+resultsmall2<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+                   hate_group_count_2016 + elasticity, data = hate_DF)
+summary(resultsmall2)
+
+# ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+# states that each of their slopes are nonzero so good for our model fit.
+
+anova(resultsmall2,result2)
+anova(result2)
 
 library(MASS)
-boxcox(resultsmall)
-boxcox(resultsmall, lambda = seq(-0.5, 1.5, 0.2))
+boxcox(resultsmall2)
+boxcox(resultsmall2, lambda = seq(-0.5, 1.5, 0.2))
+
+#Residual Plot of the smaller model from backwards selection
+plot(resultsmall2$fitted.values,resultsmall2$residuals, main="Plot of Residuals against Fitted Values")
+abline(h=0,col="red")
+
+#Took the square root because the boxcox and residual plot indicate the linear transformations aren't met
+final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+                            hate_group_count_2016 + elasticity, data = hate_DF)
+
+summary(final1)
+
+library(MASS)
+boxcox(final1)
+boxcox(final1, lambda = seq(-0.5, 1.5, 0.2))
+
+#Residual Plot of the smaller model from backwards selection
+plot(final1$fitted.values,final1$residuals, main="Plot of Residuals against Fitted Values")
+abline(h=0,col="red")
+
+#Next take the transformation data and perfrom another partial F test 
+
+#Full Model
+final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+               hate_group_count_2016 + elasticity, data = hate_DF)
+summary(final1)
+
+#Model chosen from backwards selection
+final2 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+               hate_group_count_2016, data = hate_DF)
+summary(final2)
+
+# ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+# states that each of their slopes are nonzero so good for our model fit.
+
+anova(final2,final1)
+
+#ANOTHER PARTIAL F TEST 
+
+final2 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+               hate_group_count_2016, data = hate_DF)
+summary(final2)
+
+#Model chosen from backwards selection
+final3 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo, data = hate_DF)
+summary(final3)
+
+# ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+# states that each of their slopes are nonzero so good for our model fit.
+
+anova(final3,final2)
+# #########################################################################
+
+#LOOKS LIKE THE FINAL MODEL WITH DC WILL JUST BE GINI INDEX and Confederate only???????
+#ASK GROUP 
+
+
+
+
+
+
+
 
 
 
@@ -169,12 +212,12 @@ boxcox(resultsmall, lambda = seq(-0.5, 1.5, 0.2))
 
 #Performed transformation just to make the linear assumptions a bit better
 
-new.avg_hatecrimes_per_100k_fbi<-log(hc_df$avg_hatecrimes_per_100k_fbi)
+new.avg_hatecrimes_per_100k_fbi<-log(hate_DF$avg_hatecrimes_per_100k_fbi)
 result.new<-lm(new.avg_hatecrimes_per_100k_fbi ~ share_non_citizen + 
-                 gini_index + share_non_white + HateGroupCount, data = hc_df)
+                 gini_index + share_non_white + HateGroupCount, data = hate_DF)
 
-hc_df$new.avg_hatecrimes_per_100k_fbi=new.avg_hatecrimes_per_100k_fbi
-hc_df
+hate_DF$new.avg_hatecrimes_per_100k_fbi=new.avg_hatecrimes_per_100k_fbi
+hate_DF
 
 library(MASS)
 boxcox(result.new)
@@ -188,10 +231,28 @@ acf(resultsmall$residuals)
 qqnorm(resultsmall$residuals)
 qqline(resultsmall$residuals, col="red")
 
-plot(nitrogen,yield,xlab="Nitrogen Pounds per Acre", ylab="Corn yield in Bushels per Acre", 
-     main="Plot of defects against weeks")
-result<-lm(yield~nitrogen)
-abline(result,col="blue")
+
+
+
+#Perform all possible regressions (1st order) gets you which predictors are best for certain situations
+allreg <- regsubsets(avg_hatecrimes_per_100k_fbi ~., data=hate_DF, nbest=9)
+
+##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
+best <- as.data.frame(summary(allreg)$outmat)
+best$p <- as.numeric(substr(rownames(best),1,1))+1
+best$r2 <- summary(allreg)$rsq
+best$adjr2 <- summary(allreg)$adjr2
+best$mse <- (summary(allreg)$rss)/(dim(hate_DF)[1]-best$p)
+best$cp <- summary(allreg)$cp
+best$bic <- summary(allreg)$bic
+best
+
+#Sort by various criteria
+best[order(best$r2),]     
+best[order(best$adjr2),]  
+best[order(best$mse),]    
+best[order(best$cp),]     
+best[order(best$bic),] 
 
 
 
