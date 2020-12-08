@@ -24,8 +24,6 @@ colnames(hate_DF)
 
 #Need to set categorical variables so R can recognize them as such 
 hate_DF$confederate<-factor(hate_DF$confederate)
-is.factor(hate_DF$confederate)
-contrasts(hate_DF$confederate) #Just to verify that R has the right reference class set
 hate_DF$permit<-factor(hate_DF$permit) #State has permit to purchase law 1 = yes
 hate_DF$universl<-factor(hate_DF$universl) #State has universal background checks 1 = yes
 hate_DF$con_uni_combo<-factor(hate_DF$con_uni_combo)
@@ -42,7 +40,7 @@ levels(hate_DF$con_uni_combo)
 hate_DF$con_uni_combo<-relevel(hate_DF$con_uni_combo, ref = "Neither")
 levels(hate_DF$con_uni_combo)
 
-#Used to remove all the rows that include NA values 
+#Used to remove all the rows that include NA values anywhere
 hate_DF<-hate_DF %>% drop_na(avg_hatecrimes_per_100k_fbi)
 #hate_DF<-hate_DF[!(row.names(hate_DF) %in% c('DC')),] #REMOVE THE DC NEED TO DO THAT
 
@@ -52,25 +50,22 @@ pairs(hate_DF, lower.panel=NULL, main="Scatterplots of Predictors")
 
 #Can see that a lot of variables have large amount of correlation 
 
-boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$confederate)
-boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$universl)
 boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$permit)
+boxplot(hate_DF$avg_hatecrimes_per_100k_fbi~hate_DF$con_uni_combo)
 
+# #########################################################################
+#Run a full model to look at predictors to see how correlated they are
 result<-lm(avg_hatecrimes_per_100k_fbi~., data = hate_DF)
 
 vif(result) # HFR along with male and female suicide rate is highly correlated (18+ VIF)
-
 summary(result)
 
-# #########################################################################
 #Remove the variables I don't want cause of high correlation from VIF calculation
-
 hate_DF<-hate_DF[ , !(names(hate_DF) %in% c('median_household_income', 'share_population_with_high_school_degree', 'Fem_FS_S', 'HFR', 'share_voters_voted_trump', 
                                       'share_population_in_metro_areas', 'share_non_white', 'share_non_citizen', 'Male_FS_S'))]
 
 # #########################################################################
 
-hate_DF
 #Intercept only model to set up for selection process
 regnull <- lm(avg_hatecrimes_per_100k_fbi~1, data=hate_DF)
 
@@ -83,12 +78,14 @@ step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
 
 #Forward selection model
-forward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ confederate + gini_index, 
+forward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+                       hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
                      data = hate_DF)
 summary(forward_result)
 #Backward selection model suicide rate becomes important when going with this approach
-backward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ confederate + gini_index, 
-                      data = hate_DF)
+backward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + 
+                         gini_index + elasticity + hate_group_count_2016 + con_uni_combo, 
+                       data = hate_DF)
 summary(backward_result)
 #Both selections model
 both_result<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
@@ -118,15 +115,57 @@ anova(result)
 #ANSWER: Go with the smaller model because you fail to reject the null since p value
 #is greater than your significance level of 0.05
 
-#NEED TO COMPLETE
+# #########################################################################
 
-result2<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+#Check to see if the linear assumptions are met if 1 falls within the range
+par(mfrow=c(2,2))
+
+plot(resultsmall$fitted.values,resultsmall$residuals, main="Plot of Residuals against Fitted Values")
+abline(h=0,col="red")
+
+library(MASS)
+boxcox(resultsmall, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+
+# Acf plot of residuals
+acf(resultsmall$residuals,  main="ACF Lag Plot")
+
+qqnorm(resultsmall$residuals)
+qqline(resultsmall$residuals, col="red")
+
+#Need to perform a transformation since the linear assumptions are not met when looking at boxcox 
+
+#Took the square root because the boxcox and residual plot indicate the linear transformations aren't met
+resulttrans <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+                          hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+                          data = hate_DF)
+summary(resulttrans)
+
+
+# Plots to check whether linear assumptions Hold true 
+par(mfrow=c(2,2))
+
+plot(resulttrans$fitted.values,resulttrans$residuals, main="Plot of Residuals against Fitted Values")
+abline(h=0,col="red")
+
+library(MASS)
+boxcox(resulttrans, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+
+# Acf plot of residuals
+acf(resulttrans$residuals,  main="ACF Lag Plot")
+
+qqnorm(resulttrans$residuals)
+qqline(resulttrans$residuals, col="red")
+
+# #########################################################################
+
+#Partial F test round two after the transformation
+result2<-lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
               hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
-            data = hate_DF)
+              data = hate_DF)
 summary(result2)
 
 #Model chosen from backwards selection
-resultsmall2<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+resultsmall2<-lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
                    hate_group_count_2016 + elasticity, data = hate_DF)
 summary(resultsmall2)
 
@@ -136,29 +175,13 @@ summary(resultsmall2)
 anova(resultsmall2,result2)
 anova(result2)
 
-library(MASS)
-boxcox(resultsmall2)
-boxcox(resultsmall2, lambda = seq(-0.5, 1.5, 0.2))
-
-#Residual Plot of the smaller model from backwards selection
-plot(resultsmall2$fitted.values,resultsmall2$residuals, main="Plot of Residuals against Fitted Values")
-abline(h=0,col="red")
-
-#Took the square root because the boxcox and residual plot indicate the linear transformations aren't met
 final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
                             hate_group_count_2016 + elasticity, data = hate_DF)
 
 summary(final1)
 
-library(MASS)
-boxcox(final1)
-boxcox(final1, lambda = seq(-0.5, 1.5, 0.2))
-
-#Residual Plot of the smaller model from backwards selection
-plot(final1$fitted.values,final1$residuals, main="Plot of Residuals against Fitted Values")
-abline(h=0,col="red")
-
-#Next take the transformation data and perfrom another partial F test 
+# #########################################################################
+#Next take the transformation data and perform another partial F test 
 
 #Full Model
 final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
@@ -181,7 +204,7 @@ final2 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_
                hate_group_count_2016, data = hate_DF)
 summary(final2)
 
-#Model chosen from backwards selection
+#Model withe hategroupcount removed from the data 
 final3 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo, data = hate_DF)
 summary(final3)
 
@@ -191,68 +214,25 @@ summary(final3)
 anova(final3,final2)
 # #########################################################################
 
-#LOOKS LIKE THE FINAL MODEL WITH DC WILL JUST BE GINI INDEX and Confederate only???????
-#ASK GROUP 
+# Plots to check whether linear assumptions Hold true 
+par(mfrow=c(2,2))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#Performed transformation just to make the linear assumptions a bit better
-
-new.avg_hatecrimes_per_100k_fbi<-log(hate_DF$avg_hatecrimes_per_100k_fbi)
-result.new<-lm(new.avg_hatecrimes_per_100k_fbi ~ share_non_citizen + 
-                 gini_index + share_non_white + HateGroupCount, data = hate_DF)
-
-hate_DF$new.avg_hatecrimes_per_100k_fbi=new.avg_hatecrimes_per_100k_fbi
-hate_DF
+plot(final3$fitted.values,final3$residuals, main="Plot of Residuals against Fitted Values")
+abline(h=0,col="red")
 
 library(MASS)
-boxcox(result.new)
-boxcox(result.new, lambda = seq(-0.5, 1.5, 0.2)) #Use the visual and it shows that it's pretty good and the boxcox plot isnt perfect
+boxcox(final3, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+
+# Acf plot of residuals
+acf(final3$residuals,  main="ACF Lag Plot")
+
+qqnorm(final3$residuals)
+qqline(final3$residuals, col="red")
+
+#Final Model Number 3 has gini_index and con_unit combo meaning you will have 3 equations with just Gini and the three different scenarios
+#for the reference class.  
 
 
-#ACF plot of residuals
-acf(resultsmall$residuals)
-
-#QQ plot of residuals
-qqnorm(resultsmall$residuals)
-qqline(resultsmall$residuals, col="red")
-
-
-
-
-#Perform all possible regressions (1st order) gets you which predictors are best for certain situations
-allreg <- regsubsets(avg_hatecrimes_per_100k_fbi ~., data=hate_DF, nbest=9)
-
-##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
-best <- as.data.frame(summary(allreg)$outmat)
-best$p <- as.numeric(substr(rownames(best),1,1))+1
-best$r2 <- summary(allreg)$rsq
-best$adjr2 <- summary(allreg)$adjr2
-best$mse <- (summary(allreg)$rss)/(dim(hate_DF)[1]-best$p)
-best$cp <- summary(allreg)$cp
-best$bic <- summary(allreg)$bic
-best
-
-#Sort by various criteria
-best[order(best$r2),]     
-best[order(best$adjr2),]  
-best[order(best$mse),]    
-best[order(best$cp),]     
-best[order(best$bic),] 
 
 
 

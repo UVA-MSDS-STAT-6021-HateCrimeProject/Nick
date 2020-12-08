@@ -1,0 +1,840 @@
+> # #########################################################################
+> #DATA ANALYSIS
+> # #########################################################################
+> # #########################################################################
+> #Run a full model to look at predictors to see how correlated they are
+> result<-lm(avg_hatecrimes_per_100k_fbi~., data = hate_DF)
+> 
+> vif(result) # HFR along with male and female suicide rate is highly correlated (18+ VIF)
+                 median_household_income                share_unemployed_seasonal          share_population_in_metro_areas 
+                                6.179822                                 2.930537                                 7.699727 
+share_population_with_high_school_degree                        share_non_citizen                      share_white_poverty 
+                                7.563688                                 7.164406                                 4.970353 
+                              gini_index                          share_non_white                 share_voters_voted_trump 
+                                5.133519                                 6.939588                                 5.847786 
+                              elasticity                                      HFR                                permitYes 
+                                2.221493                                29.374047                                 3.825917 
+                                Fem_FS_S                                Male_FS_S                    hate_group_count_2016 
+                               14.025748                                10.120166                                 2.644766 
+           con_uni_comboConfederate Only                con_uni_comboGun Law Only 
+                                4.192100                                 2.314819 
+> summary(result)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ ., data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.65065 -0.66614  0.01727  0.49597  1.76184 
+
+Coefficients:
+                                           Estimate Std. Error t value Pr(>|t|)  
+(Intercept)                              -2.227e+01  1.915e+01  -1.163   0.2538  
+median_household_income                   3.894e-05  4.377e-05   0.890   0.3804  
+share_unemployed_seasonal                -1.291e+00  2.581e+01  -0.050   0.9604  
+share_population_in_metro_areas           1.820e+00  2.391e+00   0.761   0.4523  
+share_population_with_high_school_degree  1.213e+01  1.252e+01   0.969   0.3399  
+share_non_citizen                         3.009e+01  1.329e+01   2.264   0.0307 *
+share_white_poverty                       2.016e+01  1.464e+01   1.377   0.1785  
+gini_index                                3.513e+01  1.993e+01   1.762   0.0879 .
+share_non_white                          -4.842e+00  2.853e+00  -1.697   0.0997 .
+share_voters_voted_trump                 -3.497e+00  3.878e+00  -0.902   0.3741  
+elasticity                               -5.710e+00  3.390e+00  -1.684   0.1022  
+HFR                                       7.114e+00  6.045e+00   1.177   0.2482  
+permitYes                                 3.443e-01  7.049e-01   0.489   0.6286  
+Fem_FS_S                                  1.650e+00  4.064e+00   0.406   0.6876  
+Male_FS_S                                -4.206e+00  4.553e+00  -0.924   0.3628  
+hate_group_count_2016                    -1.887e-02  1.458e-02  -1.294   0.2051  
+con_uni_comboConfederate Only            -7.971e-01  7.187e-01  -1.109   0.2759  
+con_uni_comboGun Law Only                -9.964e-01  5.483e-01  -1.817   0.0788 .
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.085 on 31 degrees of freedom
+  (1 observation deleted due to missingness)
+Multiple R-squared:  0.4696,	Adjusted R-squared:  0.1787 
+F-statistic: 1.614 on 17 and 31 DF,  p-value: 0.1204
+
+> 
+> #Remove the variables I don't want cause of high correlation from VIF calculation
+> hate_DF<-hate_DF[ , !(names(hate_DF) %in% c('median_household_income', 'share_population_with_high_school_degree', 'Fem_FS_S', 'HFR', 'share_voters_voted_trump', 
++                                       'share_population_in_metro_areas', 'share_non_white', 'share_non_citizen', 'Male_FS_S'))]
+> 
+> # #########################################################################
+> 
+> #Intercept only model to set up for selection process
+> regnull <- lm(avg_hatecrimes_per_100k_fbi~1, data=hate_DF)
+> 
+> #Model with all 17 predictors for our model
+> regfull <- lm(avg_hatecrimes_per_100k_fbi~., data=hate_DF)
+> 
+> ##forward selection, backward elimination, and stepwise regression
+> step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
+Start:  AIC=54.89
+avg_hatecrimes_per_100k_fbi ~ 1
+
+                            Df Sum of Sq    RSS    AIC
++ gini_index                 1   25.5545 118.44 47.119
++ permit                     1   10.4463 133.55 53.121
++ share_white_poverty        1    9.7410 134.25 53.385
++ elasticity                 1    8.4062 135.59 53.880
++ con_uni_combo              2   12.6807 131.31 54.278
+<none>                                   143.99 54.887
++ hate_group_count_2016      1    0.8608 143.13 56.587
++ share_unemployed_seasonal  1    0.7871 143.21 56.613
+
+Step:  AIC=47.12
+avg_hatecrimes_per_100k_fbi ~ gini_index
+
+                            Df Sum of Sq     RSS    AIC
++ con_uni_combo              2   30.0968  88.342 36.460
++ hate_group_count_2016      1   14.8166 103.622 42.436
++ share_white_poverty        1   10.2223 108.216 44.605
+<none>                                   118.439 47.119
++ share_unemployed_seasonal  1    4.4323 114.006 47.212
++ permit                     1    2.0298 116.409 48.254
++ elasticity                 1    0.0014 118.437 49.118
+
+Step:  AIC=36.46
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo
+
+                            Df Sum of Sq    RSS    AIC
++ hate_group_count_2016      1    4.4594 83.882 35.870
++ elasticity                 1    4.3106 84.031 35.958
+<none>                                   88.342 36.460
++ share_unemployed_seasonal  1    2.8734 85.468 36.806
++ share_white_poverty        1    1.8320 86.510 37.412
++ permit                     1    0.2757 88.066 38.303
+
+Step:  AIC=35.87
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016
+
+                            Df Sum of Sq    RSS    AIC
++ elasticity                 1    4.5444 79.338 35.085
++ share_unemployed_seasonal  1    3.8546 80.028 35.518
+<none>                                   83.882 35.870
++ share_white_poverty        1    1.7119 82.171 36.839
++ permit                     1    0.1571 83.725 37.776
+
+Step:  AIC=35.08
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016 + 
+    elasticity
+
+                            Df Sum of Sq    RSS    AIC
++ share_unemployed_seasonal  1    3.7957 75.542 34.634
+<none>                                   79.338 35.085
++ share_white_poverty        1    1.7078 77.630 35.997
++ permit                     1    0.0032 79.335 37.083
+
+Step:  AIC=34.63
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016 + 
+    elasticity + share_unemployed_seasonal
+
+                      Df Sum of Sq    RSS    AIC
+<none>                             75.542 34.634
++ share_white_poverty  1   0.84654 74.696 36.070
++ permit               1   0.14790 75.395 36.536
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Coefficients:
+                  (Intercept)                     gini_index  con_uni_comboConfederate Only      con_uni_comboGun Law Only  
+                    -16.52168                       59.19017                       -1.99418                       -0.52853  
+        hate_group_count_2016                     elasticity      share_unemployed_seasonal  
+                     -0.02428                       -5.25034                      -31.34304  
+
+> step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
+Start:  AIC=37.82
+avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + share_white_poverty + 
+    gini_index + elasticity + permit + hate_group_count_2016 + 
+    con_uni_combo
+
+                            Df Sum of Sq     RSS    AIC
+- permit                     1    0.3752  74.696 36.070
+- share_white_poverty        1    1.0738  75.395 36.536
+<none>                                    74.321 37.818
+- share_unemployed_seasonal  1    3.1453  77.466 37.891
+- elasticity                 1    3.9458  78.267 38.405
+- hate_group_count_2016      1    5.2809  79.602 39.251
+- con_uni_combo              2   17.2927  91.613 44.278
+- gini_index                 1   29.2071 103.528 52.391
+
+Step:  AIC=36.07
+avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + share_white_poverty + 
+    gini_index + elasticity + hate_group_count_2016 + con_uni_combo
+
+                            Df Sum of Sq     RSS    AIC
+- share_white_poverty        1     0.847  75.542 34.634
+- share_unemployed_seasonal  1     2.934  77.630 35.997
+<none>                                    74.696 36.070
+- elasticity                 1     4.488  79.184 36.988
+- hate_group_count_2016      1     5.467  80.163 37.602
+- con_uni_combo              2    16.962  91.658 42.302
+- gini_index                 1    31.653 106.349 51.735
+
+Step:  AIC=34.63
+avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + gini_index + 
+    elasticity + hate_group_count_2016 + con_uni_combo
+
+                            Df Sum of Sq     RSS    AIC
+<none>                                    75.542 34.634
+- share_unemployed_seasonal  1     3.796  79.338 35.085
+- elasticity                 1     4.485  80.028 35.518
+- hate_group_count_2016      1     5.686  81.229 36.262
+- con_uni_combo              2    21.606  97.148 43.211
+- gini_index                 1    33.948 109.491 51.191
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + 
+    gini_index + elasticity + hate_group_count_2016 + con_uni_combo, 
+    data = hate_DF)
+
+Coefficients:
+                  (Intercept)      share_unemployed_seasonal                     gini_index                     elasticity  
+                    -16.52168                      -31.34304                       59.19017                       -5.25034  
+        hate_group_count_2016  con_uni_comboConfederate Only      con_uni_comboGun Law Only  
+                     -0.02428                       -1.99418                       -0.52853  
+
+> step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
+Start:  AIC=54.89
+avg_hatecrimes_per_100k_fbi ~ 1
+
+                            Df Sum of Sq    RSS    AIC
++ gini_index                 1   25.5545 118.44 47.119
++ permit                     1   10.4463 133.55 53.121
++ share_white_poverty        1    9.7410 134.25 53.385
++ elasticity                 1    8.4062 135.59 53.880
++ con_uni_combo              2   12.6807 131.31 54.278
+<none>                                   143.99 54.887
++ hate_group_count_2016      1    0.8608 143.13 56.587
++ share_unemployed_seasonal  1    0.7871 143.21 56.613
+
+Step:  AIC=47.12
+avg_hatecrimes_per_100k_fbi ~ gini_index
+
+                            Df Sum of Sq     RSS    AIC
++ con_uni_combo              2   30.0968  88.342 36.460
++ hate_group_count_2016      1   14.8166 103.622 42.436
++ share_white_poverty        1   10.2223 108.216 44.605
+<none>                                   118.439 47.119
++ share_unemployed_seasonal  1    4.4323 114.006 47.212
++ permit                     1    2.0298 116.409 48.254
++ elasticity                 1    0.0014 118.437 49.118
+- gini_index                 1   25.5545 143.993 54.887
+
+Step:  AIC=36.46
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo
+
+                            Df Sum of Sq     RSS    AIC
++ hate_group_count_2016      1     4.459  83.882 35.870
++ elasticity                 1     4.311  84.031 35.958
+<none>                                    88.342 36.460
++ share_unemployed_seasonal  1     2.873  85.468 36.806
++ share_white_poverty        1     1.832  86.510 37.412
++ permit                     1     0.276  88.066 38.303
+- con_uni_combo              2    30.097 118.439 47.119
+- gini_index                 1    42.971 131.312 54.278
+
+Step:  AIC=35.87
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016
+
+                            Df Sum of Sq     RSS    AIC
++ elasticity                 1     4.544  79.338 35.085
++ share_unemployed_seasonal  1     3.855  80.028 35.518
+<none>                                    83.882 35.870
+- hate_group_count_2016      1     4.459  88.342 36.460
++ share_white_poverty        1     1.712  82.171 36.839
++ permit                     1     0.157  83.725 37.776
+- con_uni_combo              2    19.740 103.622 42.436
+- gini_index                 1    47.427 131.309 56.277
+
+Step:  AIC=35.08
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016 + 
+    elasticity
+
+                            Df Sum of Sq     RSS    AIC
++ share_unemployed_seasonal  1    3.7957  75.542 34.634
+<none>                                    79.338 35.085
+- elasticity                 1    4.5444  83.882 35.870
+- hate_group_count_2016      1    4.6932  84.031 35.958
++ share_white_poverty        1    1.7078  77.630 35.997
++ permit                     1    0.0032  79.335 37.083
+- con_uni_combo              2   23.9025 103.241 44.252
+- gini_index                 1   30.5622 109.900 49.378
+
+Step:  AIC=34.63
+avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016 + 
+    elasticity + share_unemployed_seasonal
+
+                            Df Sum of Sq     RSS    AIC
+<none>                                    75.542 34.634
+- share_unemployed_seasonal  1     3.796  79.338 35.085
+- elasticity                 1     4.485  80.028 35.518
++ share_white_poverty        1     0.847  74.696 36.070
+- hate_group_count_2016      1     5.686  81.229 36.262
++ permit                     1     0.148  75.395 36.536
+- con_uni_combo              2    21.606  97.148 43.211
+- gini_index                 1    33.948 109.491 51.191
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Coefficients:
+                  (Intercept)                     gini_index  con_uni_comboConfederate Only      con_uni_comboGun Law Only  
+                    -16.52168                       59.19017                       -1.99418                       -0.52853  
+        hate_group_count_2016                     elasticity      share_unemployed_seasonal  
+                     -0.02428                       -5.25034                      -31.34304  
+
+> 
+> #Forward selection model
+> forward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
++                        hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
++                      data = hate_DF)
+> summary(forward_result)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.8089 -0.8537  0.0081  0.8739  3.3247 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -16.52168    7.58758  -2.177  0.03498 *  
+gini_index                     59.19017   13.46484   4.396 7.11e-05 ***
+con_uni_comboConfederate Only  -1.99418    0.59090  -3.375  0.00157 ** 
+con_uni_comboGun Law Only      -0.52853    0.52534  -1.006  0.32001    
+hate_group_count_2016          -0.02428    0.01350  -1.799  0.07903 .  
+elasticity                     -5.25034    3.28586  -1.598  0.11740    
+share_unemployed_seasonal     -31.34304   21.32352  -1.470  0.14887    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.325 on 43 degrees of freedom
+Multiple R-squared:  0.4754,	Adjusted R-squared:  0.4022 
+F-statistic: 6.494 on 6 and 43 DF,  p-value: 6.245e-05
+
+> #Backward selection model suicide rate becomes important when going with this approach
+> backward_result <- lm(formula = avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + 
++                          gini_index + elasticity + hate_group_count_2016 + con_uni_combo, 
++                        data = hate_DF)
+> summary(backward_result)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + 
+    gini_index + elasticity + hate_group_count_2016 + con_uni_combo, 
+    data = hate_DF)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.8089 -0.8537  0.0081  0.8739  3.3247 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -16.52168    7.58758  -2.177  0.03498 *  
+share_unemployed_seasonal     -31.34304   21.32352  -1.470  0.14887    
+gini_index                     59.19017   13.46484   4.396 7.11e-05 ***
+elasticity                     -5.25034    3.28586  -1.598  0.11740    
+hate_group_count_2016          -0.02428    0.01350  -1.799  0.07903 .  
+con_uni_comboConfederate Only  -1.99418    0.59090  -3.375  0.00157 ** 
+con_uni_comboGun Law Only      -0.52853    0.52534  -1.006  0.32001    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.325 on 43 degrees of freedom
+Multiple R-squared:  0.4754,	Adjusted R-squared:  0.4022 
+F-statistic: 6.494 on 6 and 43 DF,  p-value: 6.245e-05
+
+> #Both selections model
+> both_result<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
++                   hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
++                 data = hate_DF)
+> summary(both_result)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.8089 -0.8537  0.0081  0.8739  3.3247 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -16.52168    7.58758  -2.177  0.03498 *  
+gini_index                     59.19017   13.46484   4.396 7.11e-05 ***
+con_uni_comboConfederate Only  -1.99418    0.59090  -3.375  0.00157 ** 
+con_uni_comboGun Law Only      -0.52853    0.52534  -1.006  0.32001    
+hate_group_count_2016          -0.02428    0.01350  -1.799  0.07903 .  
+elasticity                     -5.25034    3.28586  -1.598  0.11740    
+share_unemployed_seasonal     -31.34304   21.32352  -1.470  0.14887    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.325 on 43 degrees of freedom
+Multiple R-squared:  0.4754,	Adjusted R-squared:  0.4022 
+F-statistic: 6.494 on 6 and 43 DF,  p-value: 6.245e-05
+
+> # #########################################################################
+> 
+> #Full Model
+> result<-lm(avg_hatecrimes_per_100k_fbi~., data = hate_DF)
+> summary(result)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ ., data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.76056 -0.76557  0.00157  0.82683  3.07696 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -16.81085    8.35286  -2.013 0.050758 .  
+share_unemployed_seasonal     -29.38277   22.30601  -1.317 0.195067    
+share_white_poverty            -6.96209    9.04563  -0.770 0.445911    
+gini_index                     60.52406   15.07811   4.014 0.000248 ***
+elasticity                     -4.99468    3.38535  -1.475 0.147749    
+permitYes                      -0.25996    0.57142  -0.455 0.651550    
+hate_group_count_2016          -0.02347    0.01375  -1.707 0.095416 .  
+con_uni_comboConfederate Only  -1.92758    0.62869  -3.066 0.003830 ** 
+con_uni_comboGun Law Only      -0.51581    0.55971  -0.922 0.362147    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.346 on 41 degrees of freedom
+Multiple R-squared:  0.4839,	Adjusted R-squared:  0.3831 
+F-statistic: 4.804 on 8 and 41 DF,  p-value: 0.000323
+
+> 
+> #Model chosen from backwards selection
+> resultsmall<-lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
++                   hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
++                 data = hate_DF)
+> summary(resultsmall)
+
+Call:
+lm(formula = avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-2.8089 -0.8537  0.0081  0.8739  3.3247 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -16.52168    7.58758  -2.177  0.03498 *  
+gini_index                     59.19017   13.46484   4.396 7.11e-05 ***
+con_uni_comboConfederate Only  -1.99418    0.59090  -3.375  0.00157 ** 
+con_uni_comboGun Law Only      -0.52853    0.52534  -1.006  0.32001    
+hate_group_count_2016          -0.02428    0.01350  -1.799  0.07903 .  
+elasticity                     -5.25034    3.28586  -1.598  0.11740    
+share_unemployed_seasonal     -31.34304   21.32352  -1.470  0.14887    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.325 on 43 degrees of freedom
+Multiple R-squared:  0.4754,	Adjusted R-squared:  0.4022 
+F-statistic: 6.494 on 6 and 43 DF,  p-value: 6.245e-05
+
+> 
+> # ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+> # states that each of their slopes are nonzero so good for our model fit.
+> 
+> anova(resultsmall,result)
+Analysis of Variance Table
+
+Model 1: avg_hatecrimes_per_100k_fbi ~ gini_index + con_uni_combo + hate_group_count_2016 + 
+    elasticity + share_unemployed_seasonal
+Model 2: avg_hatecrimes_per_100k_fbi ~ share_unemployed_seasonal + share_white_poverty + 
+    gini_index + elasticity + permit + hate_group_count_2016 + 
+    con_uni_combo
+  Res.Df    RSS Df Sum of Sq     F Pr(>F)
+1     43 75.542                          
+2     41 74.321  2    1.2217 0.337 0.7159
+> anova(result)
+Analysis of Variance Table
+
+Response: avg_hatecrimes_per_100k_fbi
+                          Df Sum Sq Mean Sq F value    Pr(>F)    
+share_unemployed_seasonal  1  0.787  0.7871  0.4342 0.5136021    
+share_white_poverty        1 11.215 11.2153  6.1871 0.0170283 *  
+gini_index                 1 25.897 25.8971 14.2865 0.0005009 ***
+elasticity                 1  0.140  0.1404  0.0775 0.7821816    
+permit                     1  0.005  0.0054  0.0030 0.9567162    
+hate_group_count_2016      1 14.334 14.3344  7.9077 0.0075192 ** 
+con_uni_combo              2 17.293  8.6463  4.7699 0.0137276 *  
+Residuals                 41 74.321  1.8127                      
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> 
+> #Every sum of squares is given based on the fact that the previous predictor is in the model
+> 
+> #ANSWER: Go with the smaller model because you fail to reject the null since p value
+> #is greater than your significance level of 0.05
+> 
+> # #########################################################################
+> 
+> #Check to see if the linear assumptions are met if 1 falls within the range
+> par(mfrow=c(2,2))
+> 
+> plot(resultsmall$fitted.values,resultsmall$residuals, main="Plot of Residuals against Fitted Values")
+> abline(h=0,col="red")
+> 
+> library(MASS)
+> boxcox(resultsmall, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+Warning message:
+In lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...) :
+ extra argument ‘main’ will be disregarded 
+> 
+> # Acf plot of residuals
+> acf(resultsmall$residuals,  main="ACF Lag Plot")
+> 
+> qqnorm(resultsmall$residuals)
+> qqline(resultsmall$residuals, col="red")
+> 
+> #Need to perform a transformation since the linear assumptions are not met when looking at boxcox 
+> 
+> #Took the square root because the boxcox and residual plot indicate the linear transformations aren't met
+> resulttrans <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                           hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
++                           data = hate_DF)
+> summary(resulttrans)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.82196 -0.24013  0.03593  0.28666  0.74983 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -3.492804   2.409302  -1.450  0.15439   
+gini_index                    15.028547   4.275520   3.515  0.00105 **
+con_uni_comboConfederate Only -0.589097   0.187629  -3.140  0.00305 **
+con_uni_comboGun Law Only     -0.177738   0.166813  -1.065  0.29260   
+hate_group_count_2016         -0.006040   0.004285  -1.410  0.16588   
+elasticity                    -1.140554   1.043368  -1.093  0.28042   
+share_unemployed_seasonal     -8.177358   6.770904  -1.208  0.23376   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4209 on 43 degrees of freedom
+Multiple R-squared:  0.3765,	Adjusted R-squared:  0.2895 
+F-statistic: 4.327 on 6 and 43 DF,  p-value: 0.001686
+
+> 
+> 
+> # Plots to check whether linear assumptions Hold true 
+> par(mfrow=c(2,2))
+> 
+> plot(resulttrans$fitted.values,resulttrans$residuals, main="Plot of Residuals against Fitted Values")
+> abline(h=0,col="red")
+> 
+> library(MASS)
+> boxcox(resulttrans, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+Warning message:
+In lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...) :
+ extra argument ‘main’ will be disregarded 
+> 
+> # Acf plot of residuals
+> acf(resulttrans$residuals,  main="ACF Lag Plot")
+> 
+> qqnorm(resulttrans$residuals)
+> qqline(resulttrans$residuals, col="red")
+> 
+> # #########################################################################
+> 
+> #Partial F test round two after the transformation
+> result2<-lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++               hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
++               data = hate_DF)
+> summary(result2)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016 + elasticity + share_unemployed_seasonal, 
+    data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.82196 -0.24013  0.03593  0.28666  0.74983 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -3.492804   2.409302  -1.450  0.15439   
+gini_index                    15.028547   4.275520   3.515  0.00105 **
+con_uni_comboConfederate Only -0.589097   0.187629  -3.140  0.00305 **
+con_uni_comboGun Law Only     -0.177738   0.166813  -1.065  0.29260   
+hate_group_count_2016         -0.006040   0.004285  -1.410  0.16588   
+elasticity                    -1.140554   1.043368  -1.093  0.28042   
+share_unemployed_seasonal     -8.177358   6.770904  -1.208  0.23376   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4209 on 43 degrees of freedom
+Multiple R-squared:  0.3765,	Adjusted R-squared:  0.2895 
+F-statistic: 4.327 on 6 and 43 DF,  p-value: 0.001686
+
+> 
+> #Model chosen from backwards selection
+> resultsmall2<-lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                    hate_group_count_2016 + elasticity, data = hate_DF)
+> summary(resultsmall2)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016 + elasticity, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.80984 -0.24638  0.02124  0.27144  0.78760 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -2.878323   2.367206  -1.216  0.23050   
+gini_index                    12.790874   3.873231   3.302  0.00191 **
+con_uni_comboConfederate Only -0.613345   0.187522  -3.271  0.00209 **
+con_uni_comboGun Law Only     -0.185723   0.167548  -1.108  0.27368   
+hate_group_count_2016         -0.005419   0.004276  -1.267  0.21177   
+elasticity                    -1.149496   1.048764  -1.096  0.27902   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4231 on 44 degrees of freedom
+Multiple R-squared:  0.3553,	Adjusted R-squared:  0.2821 
+F-statistic:  4.85 on 5 and 44 DF,  p-value: 0.001282
+
+> 
+> # ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+> # states that each of their slopes are nonzero so good for our model fit.
+> 
+> anova(resultsmall2,result2)
+Analysis of Variance Table
+
+Model 1: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity
+Model 2: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity + share_unemployed_seasonal
+  Res.Df    RSS Df Sum of Sq      F Pr(>F)
+1     44 7.8751                           
+2     43 7.6167  1   0.25836 1.4586 0.2338
+> anova(result2)
+Analysis of Variance Table
+
+Response: sqrt(avg_hatecrimes_per_100k_fbi)
+                          Df Sum Sq Mean Sq F value   Pr(>F)   
+gini_index                 1 1.2164 1.21643  6.8674 0.012084 * 
+con_uni_combo              2 2.6340 1.31701  7.4351 0.001686 **
+hate_group_count_2016      1 0.2748 0.27480  1.5514 0.219678   
+elasticity                 1 0.2150 0.21501  1.2138 0.276702   
+share_unemployed_seasonal  1 0.2584 0.25836  1.4586 0.233756   
+Residuals                 43 7.6167 0.17713                    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+> 
+> final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                             hate_group_count_2016 + elasticity, data = hate_DF)
+> 
+> summary(final1)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016 + elasticity, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.80984 -0.24638  0.02124  0.27144  0.78760 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -2.878323   2.367206  -1.216  0.23050   
+gini_index                    12.790874   3.873231   3.302  0.00191 **
+con_uni_comboConfederate Only -0.613345   0.187522  -3.271  0.00209 **
+con_uni_comboGun Law Only     -0.185723   0.167548  -1.108  0.27368   
+hate_group_count_2016         -0.005419   0.004276  -1.267  0.21177   
+elasticity                    -1.149496   1.048764  -1.096  0.27902   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4231 on 44 degrees of freedom
+Multiple R-squared:  0.3553,	Adjusted R-squared:  0.2821 
+F-statistic:  4.85 on 5 and 44 DF,  p-value: 0.001282
+
+> 
+> # #########################################################################
+> #Next take the transformation data and perform another partial F test 
+> 
+> #Full Model
+> final1 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                hate_group_count_2016 + elasticity, data = hate_DF)
+> summary(final1)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016 + elasticity, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.80984 -0.24638  0.02124  0.27144  0.78760 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -2.878323   2.367206  -1.216  0.23050   
+gini_index                    12.790874   3.873231   3.302  0.00191 **
+con_uni_comboConfederate Only -0.613345   0.187522  -3.271  0.00209 **
+con_uni_comboGun Law Only     -0.185723   0.167548  -1.108  0.27368   
+hate_group_count_2016         -0.005419   0.004276  -1.267  0.21177   
+elasticity                    -1.149496   1.048764  -1.096  0.27902   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4231 on 44 degrees of freedom
+Multiple R-squared:  0.3553,	Adjusted R-squared:  0.2821 
+F-statistic:  4.85 on 5 and 44 DF,  p-value: 0.001282
+
+> 
+> #Model chosen from backwards selection
+> final2 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                hate_group_count_2016, data = hate_DF)
+> summary(final2)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.81158 -0.24454  0.01128  0.28996  0.81222 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -4.817584   1.576144  -3.057 0.003759 ** 
+gini_index                    14.431071   3.580448   4.031 0.000212 ***
+con_uni_comboConfederate Only -0.546361   0.177680  -3.075 0.003573 ** 
+con_uni_comboGun Law Only     -0.155226   0.165591  -0.937 0.353554    
+hate_group_count_2016         -0.005297   0.004285  -1.236 0.222748    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.424 on 45 degrees of freedom
+Multiple R-squared:  0.3377,	Adjusted R-squared:  0.2788 
+F-statistic: 5.737 on 4 and 45 DF,  p-value: 0.0008091
+
+> 
+> # ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+> # states that each of their slopes are nonzero so good for our model fit.
+> 
+> anova(final2,final1)
+Analysis of Variance Table
+
+Model 1: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+    hate_group_count_2016
+Model 2: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+    hate_group_count_2016 + elasticity
+  Res.Df    RSS Df Sum of Sq      F Pr(>F)
+1     45 8.0901                           
+2     44 7.8751  1   0.21501 1.2013  0.279
+> 
+> #ANOTHER PARTIAL F TEST 
+> 
+> final2 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
++                hate_group_count_2016, data = hate_DF)
+> summary(final2)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo + hate_group_count_2016, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.81158 -0.24454  0.01128  0.28996  0.81222 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                   -4.817584   1.576144  -3.057 0.003759 ** 
+gini_index                    14.431071   3.580448   4.031 0.000212 ***
+con_uni_comboConfederate Only -0.546361   0.177680  -3.075 0.003573 ** 
+con_uni_comboGun Law Only     -0.155226   0.165591  -0.937 0.353554    
+hate_group_count_2016         -0.005297   0.004285  -1.236 0.222748    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.424 on 45 degrees of freedom
+Multiple R-squared:  0.3377,	Adjusted R-squared:  0.2788 
+F-statistic: 5.737 on 4 and 45 DF,  p-value: 0.0008091
+
+> 
+> #Model withe hategroupcount removed from the data 
+> final3 <- lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo, data = hate_DF)
+> summary(final3)
+
+Call:
+lm(formula = sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + 
+    con_uni_combo, data = hate_DF)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.90641 -0.27157  0.00999  0.28930  0.85021 
+
+Coefficients:
+                              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                    -4.2829     1.5243  -2.810 0.007258 ** 
+gini_index                     13.1089     3.4366   3.815 0.000405 ***
+con_uni_comboConfederate Only  -0.6248     0.1669  -3.743 0.000504 ***
+con_uni_comboGun Law Only      -0.1975     0.1630  -1.212 0.231705    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.4264 on 46 degrees of freedom
+Multiple R-squared:  0.3152,	Adjusted R-squared:  0.2706 
+F-statistic: 7.058 on 3 and 46 DF,  p-value: 0.0005319
+
+> 
+> # ANSWER: The null hypothesis says that all missing variables are equal to 0.  The alternative 
+> # states that each of their slopes are nonzero so good for our model fit.
+> 
+> anova(final3,final2)
+Analysis of Variance Table
+
+Model 1: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo
+Model 2: sqrt(avg_hatecrimes_per_100k_fbi) ~ gini_index + con_uni_combo + 
+    hate_group_count_2016
+  Res.Df    RSS Df Sum of Sq      F Pr(>F)
+1     46 8.3649                           
+2     45 8.0901  1    0.2748 1.5285 0.2227
+> # #########################################################################
+> 
+> # Plots to check whether linear assumptions Hold true 
+> par(mfrow=c(2,2))
+> 
+> plot(final3$fitted.values,final3$residuals, main="Plot of Residuals against Fitted Values")
+> abline(h=0,col="red")
+> 
+> library(MASS)
+> boxcox(final3, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
+Warning message:
+In lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...) :
+ extra argument ‘main’ will be disregarded 
+> 
+> # Acf plot of residuals
+> acf(final3$residuals,  main="ACF Lag Plot")
+> 
+> qqnorm(final3$residuals)
+> qqline(final3$residuals, col="red")
+> 
+> #Final Model Number 3 has gini_index and con_unit combo meaning you will have 3 equations with just Gini and the three different scenarios
+> #for the referenece class.  
