@@ -756,6 +756,77 @@ qqnorm(red_inter_1$residuals)
 qqline(red_inter_1$residuals, col="red")
 
 
+# check outliers again
+
+# outlier analysis #
+
+# residuals
+
+res_full <- unname(red_inter_1[['residuals']]) # need to remove the field headers
+#res_2016 # uncomment to see residuals
+
+# outlier, influential & leverage points analysis
+
+# studentized residuals
+
+student.res<-rstandard(red_inter_1) 
+
+# externally studentized residuals
+
+ext.student.res<-rstudent(red_inter_1) 
+
+sort(ext.student.res)
+
+# plot residuals vs standardized residuals found above
+n<-length(fin_data$hc_per100k)
+p<-length(red_inter_1$coefficients)
+
+##critical value using Bonferroni procedure
+qt(1-0.05/(2*n), n-p-1)
+
+par(mfrow=c(1,3))
+plot(red_inter_1$fitted.values,res_full,main="Residuals")
+plot(red_inter_1$fitted.values,student.res,main="Studentized Residuals")
+#plot(best_mod$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
+
+# calc values
+
+plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
+abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
+abline(h=-qt(1-0.05/(2*n), n-p-1), col="red")
+
+# no outliers in the response...
+
+ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
+
+##leverages
+lev_full<-lm.influence(red_inter_1)$hat 
+
+sort(lev_full)
+
+par(mfrow=c(1,1))
+plot(lev_full, main="Leverages", ylim=c(0,0.8))
+abline(h=2*p/n, col="red")
+
+# get leverage points
+
+
+lev_full[lev_full>2*p/n]
+
+# DC and VT leveraged in full
+
+# influential observations
+DFFITS<-dffits(red_inter_1)
+DFFITS[abs(DFFITS)>2*sqrt(p/n)]
+
+DFBETAS<-dfbetas(red_inter_1)
+DFBETAS[abs(DFBETAS)>2/sqrt(n)]
+
+COOKS<-cooks.distance(red_inter_1)
+COOKS[COOKS>qf(0.5,p,n-p)]
+
+
+
 # #########################################################################
 # MODEL ANALYSIS WITHOUT DC IN THE MODEL
 # #########################################################################
