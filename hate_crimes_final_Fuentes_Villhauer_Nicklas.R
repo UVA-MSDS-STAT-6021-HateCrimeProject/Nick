@@ -1,6 +1,6 @@
 #STAT 6021 Project 2 (Hate Crimes in America)
 #David Fuentes, Matt Villhauer, Matt Nicklas
-#Using the data set from FiveThirtyEight to see which variables contribute to hate crimes measure as rate per 100K residents 
+#Using data from FiveThirtyEight, RAND Corp, and other sources to see which variables contribute to hate crimes measured as rate per 100K residents 
 
 # #########################################################################
 # We will produce a model using our full suite of methods pertaining to multiple 
@@ -23,7 +23,7 @@ colnames(hc_df)
 # DATA ANALYSIS FOR DATA WITH DC INCLUDED
 # #########################################################################
 
-# We don't really want to use the SPLC data since those data were collected for some period directly after the 2016 election. 
+# We don't really want to use the SPLC data since those data were collected for a short period (little over a week) directly after the 2016 election. 
 # SPLC also collects HC data in a very specific manner vastly different than how the FBI reports
 
 # Need to set categorical variables so R can recognize them as such 
@@ -36,7 +36,7 @@ hc_df$con_uni_combo<-factor(hc_df$con_uni_combo)
 hc_df$pk_per100k <- hc_df$pk_percap*100000 
 
 
-# remove some variables from the hc_df dataframe
+# remove some variables from the hc_df dataframe in which we aren't interested
 fbi_df_2016<-hc_df[ , !(names(hc_df) %in% c('fbi_2019_per100k', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 'confederate', 'universl',
                                             'hate_group_count_2019', 'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
@@ -60,7 +60,7 @@ fbi_df_2016<-rename(fbi_df_2016, hc_per100k=avg_hatecrimes_per_100k_fbi)
 
 fbi_df_2019<-rename(fbi_df_2019, hc_per100k=fbi_2019_per100k)
 
-# drop NAs from HC values (only Hawaii)
+# drop NAs from HC values (only Hawaii is missing)
 fbi_df_2016<-fbi_df_2016 %>% drop_na(hc_per100k)
 
 levels(fbi_df_2016$con_uni_combo)
@@ -84,19 +84,21 @@ boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$con_uni_combo, main = '2019 FBI: HC R
         ylab ='Hate Crimes per 100k (2019)', ylim=c(0,32))
 grid()
 
+# DC is a huge outlier on the avg hatecrimes 
+
 # #########################################################################
-# DC is a huge outlier on the avg hatecrimes not much to see in the scatter matrix. DC sticks out a lot as far as hate crimes, and we notice 
+# not much to see in the scatter matrix due to # of variables. DC sticks out a lot as far as hate crimes, and we notice 
 # some heavy correlation between variables. Will want to explore DC during outlier analysis
 
 pairs(fbi_df_2016, lower.panel=NULL)
 
-# fit the full data, not helpful except to look at correlation/multicollinearity
+# fit the full data; not helpful except to look at correlation/multicollinearity
 
 model_2016<-lm(hc_per100k~., data = fbi_df_2016)
 
 # run VIF. notice high values (like HFR, suicide rates, share_population_in_metro_areas). We will remove these
 
-vif(model_2016) # HFR is highly correlated (18+ VIF)
+vif(model_2016) 
 
 # remove correlated variables
 
@@ -106,9 +108,9 @@ fbi_df_2016<-fbi_df_2016[ , !(names(fbi_df_2016) %in% c('pk_per100k', 'share_non
 
 model_2016<-lm(hc_per100k~., data = fbi_df_2016)
 
-vif(model_2016) # HFR is highly correlated (18+ VIF)
+vif(model_2016)
 
-# check model summaries
+# check model summary
 
 summary(model_2016)
 
@@ -120,17 +122,17 @@ pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016, post Multicollinearity An
 # MODEL SELECTION
 # #########################################################################
 
-##intercept only model
+#intercept-only model
 regnull <- lm(hc_per100k~1, data=fbi_df_2016)
-##model with all predictors
+#full model
 regfull <- lm(hc_per100k~., data=fbi_df_2016)
 
-##forward selection, backward elimination, and stepwise regression
+#forward selection, backward elimination, and stepwise regression
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
 step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
 
-# Models from selection all showing the same results 
+# selection methods all showing the same results 
 for_model <- lm(formula = hc_per100k ~ share_voters_voted_trump + gini_index + 
                   con_uni_combo + share_non_white + elasticity, data = fbi_df_2016)
 
@@ -147,11 +149,11 @@ summary(both_model)
 step_wise<-both_model
 summary(step_wise)
 
-# all produce the same models Relatively high adj R^2 and significant t-vals
+# all produce the same model. Relatively high adj R^2 and significant t-vals
 
 par(mfrow=c(2,2))
 
-# Plots to check whether linear assumptions Hold true 
+# Plots to check whether linear assumptions hold true 
 plot(step_wise$fitted.values,step_wise$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
@@ -201,20 +203,19 @@ fbi_df_2016$hc_per100k<-sqrt(fbi_df_2016$hc_per100k)
 
 # rerun code from above
 
-# no need to rerun correlation analysis since the transformation doesn't change that analysis
+# no need to rerun correlation/VIF analysis since the transformation doesn't change that analysis
 
 pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016')
 
-##intercept only model
+#intercept only model
 regnull <- lm(hc_per100k~1, data=fbi_df_2016)
-##model with all predictors
+#full model
 regfull <- lm(hc_per100k~., data=fbi_df_2016)
 
-##forward selection, backward elimination, and stepwise regression
+#forward selection, backward elimination, and stepwise regression
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
 step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
 step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
-
 
 for_model <- lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white + 
                   gini_index + con_uni_combo + elasticity, data = fbi_df_2016)
@@ -229,14 +230,14 @@ summary(for_model)
 summary(back_model)
 summary(both_model)
 
-# they're all the same! decent adj R^2. Also the same as the models found above,
+# they're all the same! decent adj R^2. Also the same as the model found above,
 # just with transformed response
 
 full_sqrt<-lm(hc_per100k~., data = fbi_df_2016)
 
 vif(full_sqrt)
 
-# no multicollinearity, which makes sense since the transformation shouldn't have changed that
+# low VIFs, which makes sense since the transformation shouldn't have changed that
 
 fin_vars<-c('hc_per100k', 'gini_index', 'share_non_white',
             'share_voters_voted_trump', 'con_uni_combo', 'elasticity')
@@ -256,10 +257,10 @@ red<-lm(hc_per100k~gini_index+share_voters_voted_trump+share_non_white+con_uni_c
 anova(red, model_full) # elasticity is not significant with alpha = 0.05
 
 # #########################################################################
-# Use the step processes to produce similar models 
+# Use the best-criteria processes to produce similar models 
 # #########################################################################
 
-##perform all possible regressions (1st order)
+#perform all possible regressions (1st order)
 allreg <- regsubsets(hc_per100k ~., data=fbi_df_2016, nbest=9) # sqrt
 
 ##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
@@ -302,9 +303,9 @@ hategroup_mod_red<-lm(formula = hc_per100k ~ share_voters_voted_trump + share_no
 
 anova(hategroup_mod, hategroup_mod_red)
 
-# partial F says it's not significant (cannot reject H_0, that its slope's 0)
+# partial F says it's not significant (cannot reject H_0, that its corresponding beta is 0)
 
-# Tells us the best model is the one found with stepwise regression so that will be called best_mod
+# Tells us the best model is the one found with step-wise selection process so that will be called best_mod
 best_mod <- red
 
 # #########################################################################
@@ -363,7 +364,7 @@ abline(h=2*p/n, col="red")
 
 lev_full[lev_full>2*p/n]
 
-# DC and VT leveraged in full
+# DC and VT leveraged
 
 # influential observations
 DFFITS<-dffits(best_mod)
@@ -381,7 +382,7 @@ COOKS[COOKS>qf(0.5,p,n-p)]
 # SHRINKAGE MODELS
 # #########################################################################
 
-# check shrinkage models to see if they align with model_full and have decent predictive power
+# check shrinkage regression to see if we can find a challenger model
 
 # begin shrinkage analysis
 
@@ -390,40 +391,38 @@ y_2016<-fbi_df_2016$hc_per100k
 
 ###### Lasso
 
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
+# should produce MLR results
 lasso.r<-glmnet(x_2016,y_2016,alpha=1, lambda=0, thresh = 1e-14)
 coefficients(lasso.r)
 
-##MLR - produce the same thing as above **as long as thresh is small enough
+# MLR - produce the same thing as above 
 result_2016<-lm(hc_per100k~.,fbi_df_2016)
 summary(result_2016)
 
-##split data
+# split data
 set.seed(12)
 train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
 test<-(-train)
 y.test<-y_2016[test]
 
-##use CV to find optimal lambda based on training set
+# use CV to find optimal lambda based on training set
 set.seed(12)
 cv.out<-cv.glmnet(x_2016[train,],y_2016[train],alpha=1) # lasso regression
 bestlam<-cv.out$lambda.min # value of lambda that minimizes MSE (the optimal value)
 bestlam
 plot(cv.out)
 
-##fit lasso regression using training data
+# fit lasso regression using training data
 lasso.mod<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=bestlam, thresh = 1e-14)
 
-##test MSE with lambda=1
+# test MSE with lambda=1
 lasso.pred.0<-predict(lasso.mod,newx=x_2016[test,])
 mean((lasso.pred.0-y.test)^2)
 
-##fit lasso regression using training data
+# fit lasso regression using training data
 lasso.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=1, thresh = 1e-14)
 
-##test MSE with lambda=1
+# test MSE with lambda=1
 lasso.pred.1<-predict(lasso.mod.1,newx=x_2016[test,])
 mean((lasso.pred.1-y.test)^2)
 
@@ -431,22 +430,16 @@ mean((lasso.pred.1-y.test)^2)
 
 # perform ridge
 
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
 ridge.r<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
 coefficients(ridge.r)
-
-##MLR - produce the same thing as above **as long as thresh is small enough
+ 
 summary(result_2016)
-
-##split data
+ 
 set.seed(12)
 train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
 test<-(-train)
 y.test<-y_2016[test]
-
-##use CV to find optimal lambda based on training set
+ 
 set.seed(12)
 cv.out.ridge<-cv.glmnet(x_2016[train,],y_2016[train],alpha=0) # ridge regression
 bestlam.r<-cv.out.ridge$lambda.min # value of lambda that minimizes MSE (the optimal value)
@@ -467,8 +460,7 @@ ridge.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=1, thresh = 1e-1
 ridge.pred.1<-predict(ridge.mod.1,newx=x_2016[test,])
 mean((ridge.pred.1-y.test)^2)
 
-# lasso produced a slightly lower MSE
-
+# lasso produced a model with slightly lower MSE
 
 ##Compare ridge with OLS using best lambda and all observations
 out.lasso<-glmnet(x_2016,y_2016,alpha=1,lambda=bestlam,thresh = 1e-14)
@@ -478,145 +470,10 @@ cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
 
 residuals.glm(out.lasso, type = 'response')
 
-# LOOCV w Lasso
-
-sum_ressqr <- 0 # start with MSE = 0
-
-#testrow <- fbi_df_2016[c(i), ] # test DF is just the ith row
-testrow<-data.matrix(fbi_df_2016[c(1), ])
-testrow
-train_data <- fbi_df_2016[-c(1),] # training data is a DF with every row except the ith
-
-preds<-predict(out.lasso,newx = testrow, type="response") # predict the response for the ith row
-
-preds[1]
-
-cv.glm(x_2016, out.lasso, function(r, pi = 0) mean(abs(r-pi) > 0.5), 50)
-
-#### forget about this loop; doesn't really work
-
-for (i in 1:n) # loop through i = 1 to 28
-{
-  
-  testrow1 <- fbi_df_2016[c(i), ] # test DF is just the ith row
-  testrow<-data.matrix(fbi_df_2016[c(i), ])
-  
-  train_data <- fbi_df_2016[-c(i),] # training data is a DF with every row except the ith
-  
-  preds<-predict(out.lasso,newx = testrow, type="response") # predict the response for the ith row
-  
-  sum_ressqr <- sum_ressqr + (preds[1] - testrow1$hc_per100k)^2 # add the res^2 to the cumulative sum 
-  print(preds - testrow1$hc_per100k)
-  
-}
-
-print(sum_ressqr/n) # avg MSE for the LOOCV
-
-########
+# we favor the first-order model found using MLR analyses above over shrinkage regression
 
 
-## below probably doesn't matter
-
-# check with smaller dataset #
-
-
-x_2016<-model.matrix(hc_per100k~., fin_data)[,-1] # remove the first column of 1s representing the intercept
-y_2016<-fin_data$hc_per100k
-
-
-
-###### Lasso
-
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
-lasso.r<-glmnet(x_2016,y_2016,alpha=1, lambda=0, thresh = 1e-14)
-coefficients(lasso.r)
-
-##MLR - produce the same thing as above **as long as thresh is small enough
-result_2016<-lm(hc_per100k~.,fin_data)
-summary(result_2016)
-
-##split data
-set.seed(12)
-train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
-test<-(-train)
-y.test<-y_2016[test]
-
-##use CV to find optimal lambda based on training set
-set.seed(12)
-cv.out<-cv.glmnet(x_2016[train,],y_2016[train],alpha=1) # lasso regression
-bestlam<-cv.out$lambda.min # value of lambda that minimizes MSE (the optimal value)
-bestlam
-plot(cv.out)
-
-##fit lasso regression using training data
-lasso.mod<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=bestlam, thresh = 1e-14)
-
-##test MSE with lambda=1
-lasso.pred.0<-predict(lasso.mod,newx=x_2016[test,])
-mean((lasso.pred.0-y.test)^2)
-
-##fit lasso regression using training data
-lasso.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=1, thresh = 1e-14)
-
-##test MSE with lambda=1
-lasso.pred.1<-predict(lasso.mod.1,newx=x_2016[test,])
-mean((lasso.pred.1-y.test)^2)
-
-# perform ridge
-
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
-ridge.r<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
-coefficients(ridge.r)
-
-##MLR - produce the same thing as above **as long as thresh is small enough
-summary(result_2016)
-
-##split data
-set.seed(12)
-train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
-test<-(-train)
-y.test<-y_2016[test]
-
-##use CV to find optimal lambda based on training set
-set.seed(12)
-cv.out.ridge<-cv.glmnet(x_2016[train,],y_2016[train],alpha=0) # ridge regression
-bestlam.r<-cv.out.ridge$lambda.min # value of lambda that minimizes MSE (the optimal value)
-bestlam.r
-plot(cv.out.ridge)
-
-##fit ridge regression using training data
-ridge.mod<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=bestlam.r, thresh = 1e-14)
-
-##test MSE with lambda=1
-ridge.pred.0<-predict(ridge.mod,newx=x_2016[test,])
-mean((ridge.pred.0-y.test)^2)
-
-##fit ridge regression using training data
-ridge.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=1, thresh = 1e-14)
-
-##test MSE with lambda=1
-ridge.pred.1<-predict(ridge.mod.1,newx=x_2016[test,])
-mean((ridge.pred.1-y.test)^2)
-
-
-
-# lasso produced a slightly lower MSE
-
-
-##Compare ridge with OLS using best lambda and all observations
-out.lasso<-glmnet(x_2016,y_2016,alpha=1,lambda=bestlam,thresh = 1e-14)
-out.ridge<-glmnet(x_2016,y_2016,alpha=0,lambda=bestlam.r,thresh = 1e-14)
-out.ols<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
-cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
-
-
-summary(out.lasso)
-
-# LOOCV
+# LOOCV with first-order model
 
 n <- nrow(fbi_df_2016)
 sum_ressqr <- 0 # start with MSE = 0
@@ -663,23 +520,18 @@ summary(best_mod)
 summary(hategroup_mod)
 summary(red)
 
-
-
 ##perform levene's test. Null states the variances are equal for all classes. 
 library(lawstat)
 levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$con_uni_combo) # variances are equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$permit) # variances are equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$universl) # variances are equal
 
-
 summary(best_mod)
-
 
 ##perform Tukey's multiple comparisons
 library(multcomp)
 pairwise<-glht(model_full, linfct = mcp(con_uni_combo= "Tukey"))
 summary(pairwise)
-
 
 levels(fbi_df_2016$con_uni_combo)
 
@@ -704,7 +556,6 @@ points(neither$gini_index, neither$hc_per100k, pch=2, col="blue")
 points(con$gini_index, con$hc_per100k, pch=3, col="red")
 points(law$gini_index, law$hc_per100k, pch=4, col="orange")
 
-
 abline(gini_neither,lty=1, col="blue")
 abline(gini_con,lty=2, col="red") 
 abline(gini_law,lty=3, col="orange")
@@ -719,13 +570,11 @@ trump_neither <- lm(hc_per100k~share_voters_voted_trump,data=neither)
 trump_con <- lm(hc_per100k~share_voters_voted_trump,data=con)
 trump_law <- lm(hc_per100k~share_voters_voted_trump,data=law)
 
-
 # Create scatters:
 plot(fbi_df_2016$share_voters_voted_trump, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and Share Voters for Trump (2016)", xlab = 'Share Voted for Trump (2016)', ylab = 'Hate Crimes per 100k')
 points(neither$share_voters_voted_trump, neither$hc_per100k, pch=2, col="blue")
 points(con$share_voters_voted_trump, con$hc_per100k, pch=3, col="red")
 points(law$share_voters_voted_trump, law$hc_per100k, pch=4, col="orange")
-
 
 abline(trump_neither,lty=1, col="blue")
 abline(trump_con,lty=2, col="red") 
@@ -745,7 +594,6 @@ points(neither$share_non_white, neither$hc_per100k, pch=2, col="blue")
 points(con$share_non_white, con$hc_per100k, pch=3, col="red")
 points(law$share_non_white, law$hc_per100k, pch=4, col="orange")
 
-
 abline(nw_neither,lty=1, col="blue")
 abline(nw_con,lty=2, col="red") 
 abline(nw_law,lty=3, col="orange")
@@ -758,7 +606,6 @@ el_neither <- lm(hc_per100k~elasticity,data=neither)
 el_con <- lm(hc_per100k~elasticity,data=con)
 el_law <- lm(hc_per100k~elasticity,data=law)
 
-
 # Create scatters:
 
 plot(fbi_df_2016$elasticity, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and Political Elasticity", xlab = 'Elasticity Score', ylab = 'Hate Crimes per 100k')
@@ -766,14 +613,13 @@ points(neither$elasticity, neither$hc_per100k, pch=2, col="blue")
 points(con$elasticity, con$hc_per100k, pch=3, col="red")
 points(law$elasticity, law$hc_per100k, pch=4, col="orange")
 
-
 abline(el_neither,lty=1, col="blue")
 abline(el_con,lty=2, col="red") 
 abline(el_law,lty=3, col="orange")
 legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), lty=c(1,2,3), pch=c(2,3,4), col=c("blue","red","orange"))
 
 # #########################################################################
-# BEST MODEL WITH PARTIAL F ANALYSIS
+# BEST INTERACTION MODEL WITH PARTIAL F ANALYSIS
 # #########################################################################
 
 summary(best_mod)
@@ -866,7 +712,7 @@ for (i in 1:n) # loop through i = 1 to 28
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
 
-# does pretty well
+# does pretty well on 2016
 
 
 # 2019
@@ -909,9 +755,12 @@ acf(red_inter_1$residuals,  main="ACF Lag Plot")
 qqnorm(red_inter_1$residuals)
 qqline(red_inter_1$residuals, col="red")
 
+
 # #########################################################################
-# MODEL ANALYSIS WIHTOUT DC IN THE MODEL
+# MODEL ANALYSIS WITHOUT DC IN THE MODEL
 # #########################################################################
+
+# Would need to rerun lines 1-20 in this code prior to running below
 
 # remove DC
 
@@ -951,7 +800,7 @@ model_2016<-lm(hc_per100k~., data = fbi_df_2016)
 
 # run VIF. notice high values (like HFR, suicide rates, share_population_in_metro_areas). We will remove these
 
-vif(model_2016) # HFR is highly correlated (18+ VIF)
+vif(model_2016) 
 
 # remove correlated variables
 
@@ -961,7 +810,7 @@ fbi_df_2016<-fbi_df_2016[ , !(names(fbi_df_2016) %in% c('share_non_citizen', 'me
 
 model_2016<-lm(hc_per100k~., data = fbi_df_2016)
 
-vif(model_2016) # HFR is highly correlated (18+ VIF)
+vif(model_2016) 
 
 # check model summaries
 
@@ -1041,7 +890,7 @@ red<-lm(hc_per100k~gini_index+con_uni_combo, fin_data) # tested without share_no
 anova(red, model_full) # elasticity is not significant with alpha = 0.05
 
 # #########################################################################
-# Use the step processes to produce similar models
+# Use the best-criteria processes to produce similar models
 # #########################################################################
 
 ##perform all possible regressions (1st order)
@@ -1265,107 +1114,13 @@ cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
 
 # lasso produced intercept-only model...
 
-
-# check with smaller dataset #
-
-
-x_2016<-model.matrix(hc_per100k~., fin_data)[,-1] # remove the first column of 1s representing the intercept
-y_2016<-fin_data$hc_per100k
-
-
-
-###### Lasso
-
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
-lasso.r<-glmnet(x_2016,y_2016,alpha=1, lambda=0, thresh = 1e-14)
-coefficients(lasso.r)
-
-##MLR - produce the same thing as above **as long as thresh is small enough
-result_2016<-lm(hc_per100k~.,fin_data)
-summary(result_2016)
-
-##split data
-set.seed(12)
-train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
-test<-(-train)
-y.test<-y_2016[test]
-
-##use CV to find optimal lambda based on training set
-set.seed(12)
-cv.out<-cv.glmnet(x_2016[train,],y_2016[train],alpha=1) # lasso regression
-bestlam<-cv.out$lambda.min # value of lambda that minimizes MSE (the optimal value)
-bestlam
-plot(cv.out)
-
-##fit lasso regression using training data
-lasso.mod<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=bestlam, thresh = 1e-14)
-
-##test MSE with lambda=1
-lasso.pred.0<-predict(lasso.mod,newx=x_2016[test,])
-mean((lasso.pred.0-y.test)^2)
-
-##fit lasso regression using training data
-lasso.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=1, thresh = 1e-14)
-
-##test MSE with lambda=1
-lasso.pred.1<-predict(lasso.mod.1,newx=x_2016[test,])
-mean((lasso.pred.1-y.test)^2)
-
-# perform ridge
-
-##alpha=0 for ridge, alpha=1 for LASSO
-##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
-##we know theoretically the coeffs should be the same as lm when lambda is 0
-ridge.r<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
-coefficients(ridge.r)
-
-##MLR - produce the same thing as above **as long as thresh is small enough
-summary(result_2016)
-
-##split data
-set.seed(12)
-train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
-test<-(-train)
-y.test<-y_2016[test]
-
-##use CV to find optimal lambda based on training set
-set.seed(12)
-cv.out.ridge<-cv.glmnet(x_2016[train,],y_2016[train],alpha=0) # ridge regression
-bestlam.r<-cv.out.ridge$lambda.min # value of lambda that minimizes MSE (the optimal value)
-bestlam.r
-plot(cv.out.ridge)
-
-##fit ridge regression using training data
-ridge.mod<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=bestlam.r, thresh = 1e-14)
-
-##test MSE with lambda=1
-ridge.pred.0<-predict(ridge.mod,newx=x_2016[test,])
-mean((ridge.pred.0-y.test)^2)
-
-##fit ridge regression using training data
-ridge.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=1, thresh = 1e-14)
-
-##test MSE with lambda=1
-ridge.pred.1<-predict(ridge.mod.1,newx=x_2016[test,])
-mean((ridge.pred.1-y.test)^2)
-
-
-
-# lasso produced a slightly lower MSE
-
-
-##Compare ridge with OLS using best lambda and all observations
-out.lasso<-glmnet(x_2016,y_2016,alpha=1,lambda=bestlam,thresh = 1e-14)
-out.ridge<-glmnet(x_2016,y_2016,alpha=0,lambda=bestlam.r,thresh = 1e-14)
-out.ols<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
-cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
-
+# once again, we can ignore the shrinkage methods; the reasons for using them don't really fit our context (high variance, high correlation)
 
 
 
 # LOOCV
+
+# cross val on the model we produced
 
 n <- nrow(fbi_df_2016)
 sum_ressqr <- 0 # start with ss = 0
@@ -1531,7 +1286,7 @@ legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), l
 
 
 # #########################################################################
-# BEST MODEL WITHOUT DC INCLUDED
+# BEST INTERACTION MODEL WITHOUT DC INCLUDED
 # #########################################################################
 
 summary(best_mod)
@@ -1959,10 +1714,3 @@ qqline(final3$residuals, col="red")
 
 #Final Model Number 3 has gini_index and con_unit combo meaning you will have 3 equations with just Gini and the three different scenarios
 #for the reference class.  
-
-
-
-
-
-
-
